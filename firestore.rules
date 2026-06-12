@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Games: any authenticated user can read
+    match /games/{gameId} {
+      allow read: if request.auth != null;
+      allow write: if false; // only via backend / seed script
+    }
+
+    // Predictions: users can read all, write only their own
+    match /predictions/{predictionId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth.uid == request.resource.data.userId
+        && get(/databases/$(database)/documents/games/$(request.resource.data.gameId)).data.kickoff > request.time;
+
+      allow update: if (request.auth.uid == resource.data.userId
+        && get(/databases/$(database)/documents/games/$(resource.data.gameId)).data.kickoff > request.time)
+        || request.auth.token.email == 'admintesteteste@gmail.com';
+
+      allow delete: if false;
+    }
+
+    // Users: read all (for ranking), write only own profile or admin
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow create: if request.auth.uid == uid;
+      allow update: if request.auth.uid == uid
+        || request.auth.token.email == 'admintesteteste@gmail.com';
+      allow delete: if false;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
