@@ -8,9 +8,10 @@ interface GameListProps {
   grouped: GroupedGames[]
   predictions: Record<string, Prediction>
   onPredict: (gameId: string) => void
+  onViewPredictions?: (gameId: string) => void
 }
 
-export function GameList({ grouped, predictions, onPredict }: GameListProps) {
+export function GameList({ grouped, predictions, onPredict, onViewPredictions }: GameListProps) {
   if (grouped.length === 0) {
     return (
       <EmptyState
@@ -40,6 +41,7 @@ export function GameList({ grouped, predictions, onPredict }: GameListProps) {
                 game={game}
                 prediction={predictions[game.id] ?? null}
                 onPredict={() => onPredict(game.id)}
+                onViewPredictions={() => onViewPredictions?.(game.id)}
               />
             ))}
           </div>

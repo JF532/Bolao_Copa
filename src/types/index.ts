@@ -26,6 +26,8 @@ export interface UserData {
   email: string
   createdAt: number
   points?: number
+  predictionPoints?: number
+  manualPoints?: number
   active?: boolean
 }
 

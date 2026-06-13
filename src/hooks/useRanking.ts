@@ -16,7 +16,7 @@ export function useRanking() {
         .map((u) => ({
           userId: u.id,
           name: u.name,
-          totalScore: u.points ?? 0,
+          totalScore: (u.predictionPoints ?? 0) + (u.manualPoints ?? 0),
         }))
         .sort((a, b) => b.totalScore - a.totalScore || a.name.localeCompare(b.name))
 

@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from 'react'
 import type { Game, Prediction } from '../types'
 
-export type FilterType = 'all' | 'today' | 'tomorrow' | 'week' | 'finished' | 'live' | 'open' | 'date' | 'mine'
+export type FilterType = 'all' | 'today' | 'tomorrow' | 'week' | 'finished' | 'live' | 'open' | 'brazil' | 'date' | 'mine'
 
 export interface GroupedGames {
   dateKey: string
@@ -54,6 +54,7 @@ export function useGameFilters(games: Game[], predictions: Record<string, Predic
       if (g.status === 'FT') c.finished = (c.finished ?? 0) + 1
       if (g.status === 'LIVE') c.live = (c.live ?? 0) + 1
       if (g.status === 'NS') c.open = (c.open ?? 0) + 1
+      if (g.homeTeam === 'Brasil' || g.awayTeam === 'Brasil' || g.homeTeam === 'Brazil' || g.awayTeam === 'Brazil') c.brazil = (c.brazil ?? 0) + 1
       if (sameDay(g.kickoff, now)) c.today = (c.today ?? 0) + 1
       if (sameDay(g.kickoff, now + 86400000)) c.tomorrow = (c.tomorrow ?? 0) + 1
       if (isThisWeek(g.kickoff)) c.week = (c.week ?? 0) + 1
@@ -67,6 +68,7 @@ export function useGameFilters(games: Game[], predictions: Record<string, Predic
       finished: c.finished ?? 0,
       live: c.live ?? 0,
       open: c.open ?? 0,
+      brazil: c.brazil ?? 0,
       mine: c.mine ?? 0,
       date: 0,
     } as Record<FilterType, number>
@@ -83,6 +85,8 @@ export function useGameFilters(games: Game[], predictions: Record<string, Predic
         return games.filter((g) => isThisWeek(g.kickoff))
       case 'finished':
         return games.filter((g) => g.status === 'FT')
+      case 'brazil':
+        return games.filter((g) => g.homeTeam === 'Brasil' || g.awayTeam === 'Brasil' || g.homeTeam === 'Brazil' || g.awayTeam === 'Brazil')
       case 'live':
         return games.filter((g) => g.status === 'LIVE')
       case 'open':

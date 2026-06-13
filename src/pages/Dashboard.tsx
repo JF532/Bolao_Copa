@@ -10,6 +10,9 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { GameFilters } from '../components/games/GameFilters'
 import { GameList } from '../components/games/GameList'
 import { PredictionForm } from '../components/games/PredictionForm'
+import { GamePredictionsModal } from '../components/games/GamePredictionsModal'
+import { DailyPredictionStatus } from '../components/predictions/DailyPredictionStatus'
+import { MyPredictionsTabs } from '../components/predictions/MyPredictionsTabs'
 import { Calendar, Trophy, Target, TrendingUp } from 'lucide-react'
 import type { Game } from '../types'
 
@@ -19,6 +22,7 @@ export function Dashboard() {
   const { predictions, savePrediction } = usePredictions()
   const { ranking } = useRanking()
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
+  const [gameForPredictions, setGameForPredictions] = useState<Game | null>(null)
 
   const {
     filter,
@@ -83,6 +87,8 @@ export function Dashboard() {
         />
       </div>
 
+      <DailyPredictionStatus />
+
       <GameFilters
         filter={filter}
         customDate={customDate}
@@ -93,14 +99,33 @@ export function Dashboard() {
         onNextDay={nextDay}
       />
 
-      <GameList
-        grouped={grouped}
-        predictions={predictions}
-        onPredict={(gameId) => {
-          const game = games.find((g) => g.id === gameId)
-          if (game) setSelectedGame(game)
-        }}
-      />
+      {filter === 'mine' ? (
+        <MyPredictionsTabs
+          games={games}
+          predictions={predictions}
+          onPredict={(gameId) => {
+            const game = games.find((g) => g.id === gameId)
+            if (game) setSelectedGame(game)
+          }}
+          onViewPredictions={(gameId) => {
+            const game = games.find((g) => g.id === gameId)
+            if (game) setGameForPredictions(game)
+          }}
+        />
+      ) : (
+        <GameList
+          grouped={grouped}
+          predictions={predictions}
+          onPredict={(gameId) => {
+            const game = games.find((g) => g.id === gameId)
+            if (game) setSelectedGame(game)
+          }}
+          onViewPredictions={(gameId) => {
+            const game = games.find((g) => g.id === gameId)
+            if (game) setGameForPredictions(game)
+          }}
+        />
+      )}
 
       {selectedGame && (
         <PredictionForm
@@ -112,6 +137,14 @@ export function Dashboard() {
           onSave={async (h, a) => {
             await savePrediction(selectedGame.id, h, a)
           }}
+        />
+      )}
+
+      {gameForPredictions && (
+        <GamePredictionsModal
+          game={gameForPredictions}
+          open={!!gameForPredictions}
+          onClose={() => setGameForPredictions(null)}
         />
       )}
     </div>

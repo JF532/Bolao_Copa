@@ -3,10 +3,25 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+  :root {
+    --brazil-primary: #0a7e3c;
+    --brazil-secondary: #d4a843;
+    --brazil-accent: #1a3a6b;
+    --brazil-bg: #f0fdf4;
+    --brazil-gradient: linear-gradient(135deg, #0a7e3c, #1a3a6b);
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.brazil-active body {
+    background-color: #f2f0e6;
+    background-attachment: fixed;
+  }
+
+  html.brazil-active.dark body {
+    background-color: #0a0f08;
+    background-attachment: fixed;
   }
 
   body {
@@ -18,4 +33,75 @@
   .card {
     @apply bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 transition-shadow hover:shadow-md;
   }
+}
+
+@layer utilities {
+  .brazil-glow {
+    box-shadow: 0 0 16px rgba(0, 151, 57, 0.15), 0 0 32px rgba(255, 223, 0, 0.08);
+  }
+
+  .brazil-border {
+    border-color: #009739;
+  }
+
+  .brazil-bg-light {
+    background-color: #f0fdf4;
+  }
+}
+
+@keyframes brazilConfetti {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes brazilShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes brazilPulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 151, 57, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 151, 57, 0.4), 0 0 32px rgba(255, 223, 0, 0.15);
+  }
+}
+
+@keyframes brazilFloat {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-20px) scale(1.1);
+    opacity: 1;
+  }
+}
+
+.animate-brazil-confetti {
+  animation: brazilConfetti 3s ease-out forwards;
+}
+
+.animate-brazil-shimmer {
+  background-size: 200% auto;
+  animation: brazilShimmer 3s linear infinite;
+}
+
+.animate-brazil-pulse {
+  animation: brazilPulse 2s ease-in-out infinite;
+}
+
+.animate-brazil-float {
+  animation: brazilFloat 6s ease-in-out infinite;
 }

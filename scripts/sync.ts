@@ -2,7 +2,6 @@ import { db, Timestamp } from './firebase-admin'
 import { calculateScore } from '../src/utils/calculateScore'
 import {
   getWorldCupMatches,
-  getFinishedWorldCupMatches,
   mapStatus,
 } from './football-data'
 
@@ -28,18 +27,40 @@ async function calculatePointsForGame(gameId: string) {
   }
 
   const batch = db.batch()
+  const userDeltas = new Map<string, number>()
+
   for (const doc of predsSnap.docs) {
     const pred = doc.data()
+    if (pred.points !== null && pred.points !== undefined) {
+      continue
+    }
     const points = calculateScore(
       { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
       result
     )
     batch.update(doc.ref, { points })
+    const prev = userDeltas.get(pred.userId) ?? 0
+    userDeltas.set(pred.userId, prev + points)
   }
+
+  const updatedCount = [...userDeltas.values()].reduce((s, v) => s + (v !== 0 ? 1 : 0), 0)
+  if (updatedCount === 0) {
+    console.log(`  All predictions for game ${gameId} already have points.`)
+    return
+  }
+
   await batch.commit()
   console.log(
-    `  Points updated for ${predsSnap.size} predictions in game ${gameId}.`
+    `  Points updated for ${updatedCount} predictions in game ${gameId}.`
   )
+
+  for (const [userId, delta] of userDeltas) {
+    if (delta === 0) continue
+    const userDoc = await db.collection('users').doc(userId).get()
+    const current = (userDoc.data()?.predictionPoints as number) ?? 0
+    await db.collection('users').doc(userId).update({ predictionPoints: current + delta })
+    console.log(`  User ${userId}: predictionPoints ${current} → ${current + delta} (Δ ${delta}).`)
+  }
 }
 
 function toTimestamp(val: unknown): Timestamp | null {
@@ -49,14 +70,14 @@ function toTimestamp(val: unknown): Timestamp | null {
   return null
 }
 
-// ─── Sync (daily) ───────────────────────────────────────────────
+// ─── Sync (a cada 5 min) ─────────────────────────────────────────
 async function syncGames() {
-  console.log('[sync] Fetching finished World Cup matches...')
+  console.log('[sync] Fetching all World Cup matches...')
 
-  const data = await getFinishedWorldCupMatches()
+  const data = await getWorldCupMatches()
 
   if (!data?.matches?.length) {
-    console.log('[sync] No finished matches returned.')
+    console.log('[sync] No matches returned.')
     return
   }
 
@@ -66,12 +87,14 @@ async function syncGames() {
   for (const m of data.matches) {
     const id = String(m.id)
     const status = mapStatus(m.status)
+    const update: Record<string, unknown> = { status }
 
-    batch.set(db.collection('games').doc(id), {
-      status,
-      homeGoals: m.score.fullTime.home,
-      awayGoals: m.score.fullTime.away,
-    }, { merge: true })
+    if (m.score.fullTime.home !== null && m.score.fullTime.away !== null) {
+      update.homeGoals = m.score.fullTime.home
+      update.awayGoals = m.score.fullTime.away
+    }
+
+    batch.set(db.collection('games').doc(id), update, { merge: true })
 
     if (status === 'FT') {
       newlyFinished.push(id)
@@ -120,6 +143,32 @@ async function importInitialGames() {
   console.log(`[import] ${data.matches.length} games saved to Firestore.`)
 }
 
+// ─── Recover ──────────────────────────────────────────────────
+async function recoverPredictionPoints() {
+  console.log('[recover] Summing all prediction points per user...')
+
+  const predsSnap = await db.collection('predictions').get()
+  const totals = new Map<string, number>()
+
+  for (const doc of predsSnap.docs) {
+    const pred = doc.data()
+    const pts = (pred.points as number) ?? 0
+    const prev = totals.get(pred.userId) ?? 0
+    totals.set(pred.userId, prev + pts)
+  }
+
+  const batch = db.batch()
+  for (const [userId, total] of totals) {
+    batch.update(db.collection('users').doc(userId), { predictionPoints: total })
+  }
+  await batch.commit()
+
+  console.log(`[recover] Updated ${totals.size} users with predictionPoints.`)
+  for (const [userId, total] of totals) {
+    console.log(`  ${userId}: ${total} pts`)
+  }
+}
+
 // ─── CLI ───────────────────────────────────────────────────────
 const command = process.argv[2]
 
@@ -131,10 +180,14 @@ async function main() {
     case 'sync':
       await syncGames()
       break
+    case 'recover':
+      await recoverPredictionPoints()
+      break
     default:
-      console.log('Usage: npx tsx scripts/sync.ts [import|sync]')
+      console.log('Usage: npx tsx scripts/sync.ts [import|sync|recover]')
       console.log('  import  - Fetch ALL World Cup games (one-time)')
-      console.log('  sync    - Update only non-finished games')
+      console.log('  sync    - Update games and calculate points')
+      console.log('  recover - Rebuild predictionPoints from all predictions')
       process.exit(1)
   }
 }

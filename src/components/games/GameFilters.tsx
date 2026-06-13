@@ -13,6 +13,7 @@ const quickFilters: QuickFilter[] = [
   { type: 'week', label: 'Esta Semana' },
   { type: 'finished', label: 'Encerrados' },
   { type: 'live', label: 'Ao Vivo' },
+  { type: 'brazil', label: '🇧🇷 Brasil' },
   { type: 'open', label: 'Abertos' },
 ]
 
@@ -52,19 +53,27 @@ export function GameFilters({
               key={type}
               onClick={() => onFilterChange(type)}
               className={`flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-full text-sm font-medium transition-all duration-200 shrink-0 ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                type === 'brazil' && isActive
+                  ? 'bg-[#009739] text-white shadow-sm shadow-[#009739]/[0.3]'
+                  : type === 'brazil' && !isActive
+                    ? 'bg-[#009739]/[0.08] text-[#009739] dark:text-[#4ade80] hover:bg-[#009739]/[0.15]'
+                    : isActive
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
               }`}
             >
               {label}
               {count > 0 && (
-                <span
-                  className={`text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center ${
-                    isActive
-                      ? 'bg-white/20 text-white'
-                      : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-                  }`}
+                  <span
+                    className={`text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center ${
+                      type === 'brazil' && isActive
+                        ? 'bg-white/20 text-white'
+                        : type === 'brazil'
+                          ? 'bg-[#009739]/[0.15] text-[#009739] dark:text-[#4ade80]'
+                          : isActive
+                            ? 'bg-white/20 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                    }`}
                 >
                   {count}
                 </span>
