@@ -61,7 +61,7 @@ export function Admin() {
                         <td className="py-3 px-4 text-right">
                           <AdminScoreEditor
                             id={u.id}
-                            currentPoints={u.points ?? 0}
+                            currentPoints={u.manualPoints ?? 0}
                             onSave={updatePoints}
                           />
                         </td>

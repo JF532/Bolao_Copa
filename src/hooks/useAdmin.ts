@@ -17,7 +17,7 @@ export function useAdmin() {
   }, [])
 
   const updatePoints = async (userId: string, points: number) => {
-    await updateDoc(doc(db, 'users', userId), { points })
+    await updateDoc(doc(db, 'users', userId), { manualPoints: points })
   }
 
   const toggleActive = async (userId: string, active: boolean) => {
