@@ -50,8 +50,9 @@ async function calculatePointsForGame(gameId: string) {
 
   const affectedUsers = [...userDeltas.entries()].filter(([, v]) => v !== 0)
   if (affectedUsers.length > 0) {
-    const userRefs = affectedUsers.map(([uid]) => db.collection('users').doc(uid))
-    const userDocs = await db.getAll(...userRefs)
+    const userDocs = await Promise.all(
+      affectedUsers.map(([uid]) => db.collection('users').doc(uid).get())
+    )
     for (const userDoc of userDocs) {
       if (!userDoc.exists) continue
       const userId = userDoc.id
@@ -84,8 +85,9 @@ async function syncGames() {
     return
   }
 
-  const refs = data.matches.map(m => db.collection('games').doc(String(m.id)))
-  const snapshots = await db.getAll(...refs)
+  const snapshots = await Promise.all(
+    data.matches.map(m => db.collection('games').doc(String(m.id)).get())
+  )
   const prevMap = new Map(snapshots.map(s => [s.id, s]))
 
   const batch = db.batch()
