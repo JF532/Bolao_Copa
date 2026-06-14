@@ -2,7 +2,7 @@ name: Sync Football API
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # a cada 10 minutos
+    - cron: '0 8 * * *'   # 05:00 BRT (08:00 UTC) — temporário até reset da cota
   workflow_dispatch:
 
 jobs:
