@@ -1,4 +1,5 @@
 import { db, Timestamp } from './firebase-admin'
+import type { DocumentSnapshot } from 'firebase-admin/firestore'
 import { calculateScore } from '../src/utils/calculateScore'
 import {
   getWorldCupMatches,
@@ -16,10 +17,12 @@ async function calculatePointsForGame(gameId: string) {
 
   const result = { homeGoals, awayGoals }
 
-  const predsSnap = await db
-    .collection('predictions')
-    .where('gameId', '==', gameId)
-    .get()
+  const predsSnap = await withRetry(() =>
+    db
+      .collection('predictions')
+      .where('gameId', '==', gameId)
+      .get()
+  )
 
   if (predsSnap.empty) {
     console.log(`  No predictions for game ${gameId}.`)
@@ -50,9 +53,13 @@ async function calculatePointsForGame(gameId: string) {
 
   const affectedUsers = [...userDeltas.entries()].filter(([, v]) => v !== 0)
   if (affectedUsers.length > 0) {
-    const userDocs = await Promise.all(
-      affectedUsers.map(([uid]) => db.collection('users').doc(uid).get())
-    )
+    const userRefs = affectedUsers.map(([uid]) => db.collection('users').doc(uid))
+    const userDocs: DocumentSnapshot[] = []
+    for (let i = 0; i < userRefs.length; i += CHUNK_SIZE) {
+      const chunk = userRefs.slice(i, i + CHUNK_SIZE)
+      const snaps = await withRetry(() => db.getAll(...chunk))
+      userDocs.push(...snaps)
+    }
     for (const userDoc of userDocs) {
       if (!userDoc.exists) continue
       const userId = userDoc.id
@@ -67,11 +74,28 @@ async function calculatePointsForGame(gameId: string) {
   console.log(`  Points updated for ${predictionCount} predictions in game ${gameId}.`)
 }
 
-function toTimestamp(val: unknown): Timestamp | null {
-  if (!val) return null
-  if (val instanceof Timestamp) return val
-  if (typeof val === 'number') return new Timestamp(Math.floor(val / 1000), 0)
-  return null
+const CHUNK_SIZE = 10
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 4,
+): Promise<T> {
+  let lastError: Error
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (err: any) {
+      lastError = err
+      if (err?.code === 8) {
+        const delay = Math.pow(2, attempt) * 1000
+        console.log(`  Quota exceeded — tentativa ${attempt + 1}/${maxRetries} em ${delay}ms...`)
+        await new Promise(r => setTimeout(r, delay))
+      } else {
+        throw err
+      }
+    }
+  }
+  throw lastError!
 }
 
 // ─── Sync ────────────────────────────────────────────────────────
@@ -85,9 +109,13 @@ async function syncGames() {
     return
   }
 
-  const snapshots = await Promise.all(
-    data.matches.map(m => db.collection('games').doc(String(m.id)).get())
-  )
+  const refs = data.matches.map(m => db.collection('games').doc(String(m.id)))
+  const snapshots: DocumentSnapshot[] = []
+  for (let i = 0; i < refs.length; i += CHUNK_SIZE) {
+    const chunk = refs.slice(i, i + CHUNK_SIZE)
+    const snaps = await withRetry(() => db.getAll(...chunk))
+    snapshots.push(...snaps)
+  }
   const prevMap = new Map(snapshots.map(s => [s.id, s]))
 
   const batch = db.batch()
