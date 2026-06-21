@@ -35,19 +35,20 @@ async function calculatePointsForGame(gameId: string) {
 
   for (const doc of predsSnap.docs) {
     const pred = doc.data()
-    if (pred.points !== null && pred.points !== undefined) continue
-    const points = calculateScore(
+    const oldPoints = pred.points ?? 0
+    const newPoints = calculateScore(
       { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
       result
     )
-    batch.update(doc.ref, { points })
+    if (newPoints === oldPoints) continue
+    batch.update(doc.ref, { points: newPoints })
     predictionCount++
     const prev = userDeltas.get(pred.userId) ?? 0
-    userDeltas.set(pred.userId, prev + points)
+    userDeltas.set(pred.userId, prev + (newPoints - oldPoints))
   }
 
   if (predictionCount === 0) {
-    console.log(`  All predictions for game ${gameId} already have points.`)
+    console.log(`  No prediction points changed for game ${gameId}.`)
     return
   }
 
@@ -149,7 +150,13 @@ async function syncGames() {
     batch.set(db.collection('games').doc(id), update, { merge: true })
     changedCount++
 
-    if (status === 'FT' && prev?.data()?.status !== 'FT') {
+    if (
+      status === 'FT' && (
+        prev?.data()?.status !== 'FT' ||
+        prev.data()?.homeGoals !== homeGoals ||
+        prev.data()?.awayGoals !== awayGoals
+      )
+    ) {
       newlyFinished.push(id)
     }
   }
@@ -202,26 +209,51 @@ async function importInitialGames() {
 
 // ─── Recover ──────────────────────────────────────────────────
 async function recoverPredictionPoints() {
-  console.log('[recover] Summing all prediction points per user...')
+  console.log('[recover] Recalculating all prediction points from game results...')
+
+  const gamesSnap = await db.collection('games')
+    .where('status', '==', 'FT')
+    .get()
+  const gameResults = new Map<string, { homeGoals: number; awayGoals: number }>()
+  for (const doc of gamesSnap.docs) {
+    const g = doc.data()
+    if (g.homeGoals != null && g.awayGoals != null) {
+      gameResults.set(doc.id, { homeGoals: g.homeGoals, awayGoals: g.awayGoals })
+    }
+  }
+  console.log(`[recover] Found ${gameResults.size} finished games with scores.`)
 
   const predsSnap = await db.collection('predictions').get()
-  const totals = new Map<string, number>()
-
-  for (const doc of predsSnap.docs) {
-    const pred = doc.data()
-    const pts = (pred.points as number) ?? 0
-    const prev = totals.get(pred.userId) ?? 0
-    totals.set(pred.userId, prev + pts)
-  }
+  const userTotals = new Map<string, number>()
+  let updatedCount = 0
 
   const batch = db.batch()
-  for (const [userId, total] of totals) {
+  for (const doc of predsSnap.docs) {
+    const pred = doc.data()
+    const result = gameResults.get(pred.gameId)
+    if (!result) continue
+
+    const newPoints = calculateScore(
+      { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
+      result
+    )
+    if (pred.points !== newPoints) {
+      batch.update(doc.ref, { points: newPoints })
+      updatedCount++
+    }
+
+    const prev = userTotals.get(pred.userId) ?? 0
+    userTotals.set(pred.userId, prev + newPoints)
+  }
+
+  for (const [userId, total] of userTotals) {
     batch.update(db.collection('users').doc(userId), { predictionPoints: total })
   }
+
   await batch.commit()
 
-  console.log(`[recover] Updated ${totals.size} users with predictionPoints.`)
-  for (const [userId, total] of totals) {
+  console.log(`[recover] Recalculated ${updatedCount} predictions and updated ${userTotals.size} users.`)
+  for (const [userId, total] of userTotals) {
     console.log(`  ${userId}: ${total} pts`)
   }
 }
@@ -244,7 +276,7 @@ async function main() {
       console.log('Usage: npx tsx scripts/sync.ts [import|sync|recover]')
       console.log('  import  - Fetch ALL World Cup games (one-time)')
       console.log('  sync    - Update games and calculate points')
-      console.log('  recover - Rebuild predictionPoints from all predictions')
+      console.log('  recover - Recalculate all prediction points from game results')
       process.exit(1)
   }
 }
