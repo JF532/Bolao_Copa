@@ -80,7 +80,7 @@ export function UpcomingPredictions({ games, predictions, onPredict, onViewPredi
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {onViewPredictions && (
+                {onViewPredictions && game.kickoff <= Date.now() && (
                   <button
                     onClick={() => onViewPredictions(game.id)}
                     className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1"
