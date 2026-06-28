@@ -87,7 +87,7 @@ export function Dashboard() {
         />
       </div>
 
-      <DailyPredictionStatus />
+      <DailyPredictionStatus games={games} ranking={ranking} />
 
       <GameFilters
         filter={filter}

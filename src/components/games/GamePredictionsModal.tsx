@@ -15,8 +15,7 @@ interface GamePredictionsModalProps {
 
 function formatPoints(points: number | null): string {
   if (points === null) return ''
-  if (points === 3) return '+3'
-  if (points === 1) return '+1'
+  if (points > 0) return `+${points}`
   return '0'
 }
 

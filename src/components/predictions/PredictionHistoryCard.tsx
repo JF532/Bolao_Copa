@@ -48,8 +48,7 @@ const gradeConfig = {
 
 function formatPoints(points: number | null): string {
   if (points === null || points === undefined) return ''
-  if (points === 3) return '+3 pts'
-  if (points === 1) return '+1 pt'
+  if (points > 0) return `+${points} pts`
   return '0 pts'
 }
 

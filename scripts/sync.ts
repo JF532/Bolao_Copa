@@ -16,6 +16,7 @@ async function calculatePointsForGame(gameId: string) {
   if (homeGoals === null || awayGoals === null) return
 
   const result = { homeGoals, awayGoals }
+  const stage = game.stage as string | undefined
 
   const predsSnap = await withRetry(() =>
     db
@@ -38,7 +39,8 @@ async function calculatePointsForGame(gameId: string) {
     const oldPoints = pred.points ?? 0
     const newPoints = calculateScore(
       { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
-      result
+      result,
+      stage
     )
     if (newPoints === oldPoints) continue
     batch.update(doc.ref, { points: newPoints })
@@ -136,12 +138,13 @@ async function syncGames() {
       prev?.exists &&
       prev.data()?.status === status &&
       prev.data()?.homeGoals === homeGoals &&
-      prev.data()?.awayGoals === awayGoals
+      prev.data()?.awayGoals === awayGoals &&
+      prev.data()?.stage === m.stage
     ) {
       continue
     }
 
-    const update: Record<string, unknown> = { status }
+    const update: Record<string, unknown> = { status, stage: m.stage }
     if (scoreAvailable) {
       update.homeGoals = homeGoals
       update.awayGoals = awayGoals
@@ -198,6 +201,7 @@ async function importInitialGames() {
       awayTeam: m.awayTeam.name,
       kickoff: Timestamp.fromDate(kickoffDate),
       status: mapStatus(m.status),
+      stage: m.stage,
       homeGoals: m.score.fullTime.home,
       awayGoals: m.score.fullTime.away,
     })
@@ -214,11 +218,11 @@ async function recoverPredictionPoints() {
   const gamesSnap = await db.collection('games')
     .where('status', '==', 'FT')
     .get()
-  const gameResults = new Map<string, { homeGoals: number; awayGoals: number }>()
+  const gameResults = new Map<string, { homeGoals: number; awayGoals: number; stage?: string }>()
   for (const doc of gamesSnap.docs) {
     const g = doc.data()
     if (g.homeGoals != null && g.awayGoals != null) {
-      gameResults.set(doc.id, { homeGoals: g.homeGoals, awayGoals: g.awayGoals })
+      gameResults.set(doc.id, { homeGoals: g.homeGoals, awayGoals: g.awayGoals, stage: g.stage })
     }
   }
   console.log(`[recover] Found ${gameResults.size} finished games with scores.`)
@@ -235,7 +239,8 @@ async function recoverPredictionPoints() {
 
     const newPoints = calculateScore(
       { homeGoals: pred.homeGoals, awayGoals: pred.awayGoals },
-      result
+      result,
+      result.stage
     )
     if (pred.points !== newPoints) {
       batch.update(doc.ref, { points: newPoints })

@@ -8,6 +8,7 @@ export interface Game {
   status: GameStatus
   homeGoals: number | null
   awayGoals: number | null
+  stage: string
 }
 
 export interface Prediction {

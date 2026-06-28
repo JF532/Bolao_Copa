@@ -15,8 +15,7 @@ interface GameCardProps {
 
 function formatPoints(points: number | null): string {
   if (points === null || points === undefined) return ''
-  if (points === 3) return '+3'
-  if (points === 1) return '+1'
+  if (points > 0) return `+${points}`
   return '0'
 }
 
@@ -156,7 +155,8 @@ export function GameCard({ game, prediction, onPredict, onViewPredictions }: Gam
           <div>
             {isFinished && prediction && (
               (() => {
-                const grade = prediction.points === 3 ? 3 : prediction.points === 1 ? 1 : 0
+                const pts = prediction.points ?? -1
+                const grade = [6, 3].includes(pts) ? 3 : [2, 1].includes(pts) ? 1 : 0
                 const cfg = gradeConfig[grade]
                 return (
                   <span className={`text-sm font-medium ${cfg.text} flex items-center gap-1.5`}>

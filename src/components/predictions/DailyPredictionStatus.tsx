@@ -1,12 +1,11 @@
-import { useMemo, useState } from 'react'
-import { useGames } from '../../hooks/useGames'
-import { useAllPredictions } from '../../hooks/useAllPredictions'
-import { useRanking } from '../../hooks/useRanking'
+import { useMemo, useState, useEffect } from 'react'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { db } from '../../firebase/config'
 import { Avatar } from '../ui/Avatar'
 import { Skeleton } from '../ui/Skeleton'
 import { Modal } from '../ui/Modal'
 import { Users, ChevronRight } from 'lucide-react'
-import type { Game, Prediction } from '../../types'
+import type { Game, Prediction, UserRanking } from '../../types'
 
 interface UserStatus {
   userId: string
@@ -32,7 +31,7 @@ function isOpenForPredictions(game: Game): boolean {
 function computeStatuses(
   users: { userId: string; name: string }[],
   todayGames: Game[],
-  allPredictions: Prediction[]
+  todayPredictions: Prediction[]
 ): UserStatus[] {
   const todayGameIds = new Set(todayGames.map((g) => g.id))
   const total = todayGames.length
@@ -40,7 +39,7 @@ function computeStatuses(
   if (total === 0) return []
 
   return users.map((user) => {
-    const userPreds = allPredictions.filter(
+    const userPreds = todayPredictions.filter(
       (p) => p.userId === user.userId && todayGameIds.has(p.gameId)
     )
     return {
@@ -115,10 +114,14 @@ function UserCard({ status }: { status: UserStatus }) {
   )
 }
 
-export function DailyPredictionStatus() {
-  const { games, loading: gamesLoading } = useGames()
-  const { allPredictions, loading: predsLoading } = useAllPredictions()
-  const { ranking, loading: rankLoading } = useRanking()
+interface DailyPredictionStatusProps {
+  games: Game[]
+  ranking: UserRanking[]
+}
+
+export function DailyPredictionStatus({ games, ranking }: DailyPredictionStatusProps) {
+  const [todayPredictions, setTodayPredictions] = useState<Prediction[]>([])
+  const [predsLoading, setPredsLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
 
   const todayGames = useMemo(
@@ -126,17 +129,42 @@ export function DailyPredictionStatus() {
     [games]
   )
 
+  const todayGameIds = useMemo(
+    () => todayGames.map((g) => g.id),
+    [todayGames]
+  )
+
   const users = useMemo(
     () => ranking.map((r) => ({ userId: r.userId, name: r.name })),
     [ranking]
   )
 
+  useEffect(() => {
+    if (todayGameIds.length === 0) {
+      setTodayPredictions([])
+      setPredsLoading(false)
+      return
+    }
+
+    setPredsLoading(true)
+    const q = query(
+      collection(db, 'predictions'),
+      where('gameId', 'in', todayGameIds)
+    )
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map((d) => ({ ...d.data(), id: d.id } as Prediction))
+      setTodayPredictions(list)
+      setPredsLoading(false)
+    })
+    return unsub
+  }, [todayGameIds])
+
   const statuses = useMemo(
-    () => computeStatuses(users, todayGames, allPredictions),
-    [users, todayGames, allPredictions]
+    () => computeStatuses(users, todayGames, todayPredictions),
+    [users, todayGames, todayPredictions]
   )
 
-  const loading = gamesLoading || predsLoading || rankLoading
+  const loading = predsLoading
 
   if (loading) {
     return (

@@ -18,6 +18,7 @@ export interface FDMatch {
   id: number
   utcDate: string
   status: FDStatus
+  stage: string
   homeTeam: FDTeam
   awayTeam: FDTeam
   score: FDScore
