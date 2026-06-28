@@ -1,6 +1,6 @@
 import { db, Timestamp } from './firebase-admin'
 import type { DocumentSnapshot } from 'firebase-admin/firestore'
-import { calculateScore } from '../src/utils/calculateScore'
+import { calculateScore, getEffectiveResult } from '../src/utils/calculateScore'
 import {
   getWorldCupMatches,
   mapStatus,
@@ -11,11 +11,8 @@ async function calculatePointsForGame(gameId: string) {
   if (!gameDoc.exists) return
 
   const game = gameDoc.data()!
-  const homeGoals = game.homeGoals as number | null
-  const awayGoals = game.awayGoals as number | null
-  if (homeGoals === null || awayGoals === null) return
-
-  const result = { homeGoals, awayGoals }
+  const result = getEffectiveResult(game)
+  if (!result) return
   const stage = game.stage as string | undefined
 
   const predsSnap = await withRetry(() =>
@@ -133,18 +130,30 @@ async function syncGames() {
     const prev = prevMap.get(id)
 
     const scoreAvailable = homeGoals !== null && awayGoals !== null
+    const gameDuration = m.score.duration ?? 'REGULAR'
+    const extraTimeHome = m.score.extraTime?.home ?? null
+    const extraTimeAway = m.score.extraTime?.away ?? null
+    const penaltiesHome = m.score.penalties?.home ?? null
+    const penaltiesAway = m.score.penalties?.away ?? null
 
     if (
       prev?.exists &&
       prev.data()?.status === status &&
       prev.data()?.homeGoals === homeGoals &&
       prev.data()?.awayGoals === awayGoals &&
-      prev.data()?.stage === m.stage
+      prev.data()?.stage === m.stage &&
+      prev.data()?.homeTeam === m.homeTeam.name &&
+      prev.data()?.awayTeam === m.awayTeam.name &&
+      prev.data()?.duration === gameDuration &&
+      prev.data()?.extraTimeHome === extraTimeHome &&
+      prev.data()?.extraTimeAway === extraTimeAway &&
+      prev.data()?.penaltiesHome === penaltiesHome &&
+      prev.data()?.penaltiesAway === penaltiesAway
     ) {
       continue
     }
 
-    const update: Record<string, unknown> = { status, stage: m.stage }
+    const update: Record<string, unknown> = { status, stage: m.stage, homeTeam: m.homeTeam.name, awayTeam: m.awayTeam.name, duration: gameDuration, extraTimeHome, extraTimeAway, penaltiesHome, penaltiesAway }
     if (scoreAvailable) {
       update.homeGoals = homeGoals
       update.awayGoals = awayGoals
@@ -157,7 +166,10 @@ async function syncGames() {
       status === 'FT' && (
         prev?.data()?.status !== 'FT' ||
         prev.data()?.homeGoals !== homeGoals ||
-        prev.data()?.awayGoals !== awayGoals
+        prev.data()?.awayGoals !== awayGoals ||
+        prev.data()?.duration !== gameDuration ||
+        prev.data()?.extraTimeHome !== extraTimeHome ||
+        prev.data()?.extraTimeAway !== extraTimeAway
       )
     ) {
       newlyFinished.push(id)
@@ -204,6 +216,11 @@ async function importInitialGames() {
       stage: m.stage,
       homeGoals: m.score.fullTime.home,
       awayGoals: m.score.fullTime.away,
+      duration: m.score.duration ?? 'REGULAR',
+      extraTimeHome: m.score.extraTime?.home ?? null,
+      extraTimeAway: m.score.extraTime?.away ?? null,
+      penaltiesHome: m.score.penalties?.home ?? null,
+      penaltiesAway: m.score.penalties?.away ?? null,
     })
   }
 
@@ -221,8 +238,9 @@ async function recoverPredictionPoints() {
   const gameResults = new Map<string, { homeGoals: number; awayGoals: number; stage?: string }>()
   for (const doc of gamesSnap.docs) {
     const g = doc.data()
-    if (g.homeGoals != null && g.awayGoals != null) {
-      gameResults.set(doc.id, { homeGoals: g.homeGoals, awayGoals: g.awayGoals, stage: g.stage })
+    const eff = getEffectiveResult(g)
+    if (eff) {
+      gameResults.set(doc.id, { homeGoals: eff.homeGoals, awayGoals: eff.awayGoals, stage: g.stage })
     }
   }
   console.log(`[recover] Found ${gameResults.size} finished games with scores.`)

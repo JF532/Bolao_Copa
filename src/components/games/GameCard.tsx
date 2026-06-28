@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { Clock, Eye, Star, Users } from 'lucide-react'
 import type { Game, Prediction } from '../../types'
 import { formatDateTime } from '../../utils/formatDate'
+import { getDisplayScore } from '../../utils/calculateScore'
 import { CountryFlag } from '../ui/CountryFlag'
 import { Badge } from '../ui/Badge'
 import { BrazilCountdown } from '../ui/BrazilCountdown'
@@ -51,6 +52,8 @@ export function GameCard({ game, prediction, onPredict, onViewPredictions }: Gam
   }
 
   const config = statusConfig[game.status]
+  const displayScore = getDisplayScore(game)
+  const durationLabel = game.duration === 'EXTRA_TIME' ? 'Prorrogação' : game.duration === 'PENALTY_SHOOTOUT' ? 'Pênaltis' : null
 
   return (
     <motion.div
@@ -87,6 +90,15 @@ export function GameCard({ game, prediction, onPredict, onViewPredictions }: Gam
                 🇧🇷 Brasil
               </span>
             )}
+            {durationLabel && (
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                game.duration === 'PENALTY_SHOOTOUT'
+                  ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                  : 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+              }`}>
+                {durationLabel}
+              </span>
+            )}
           </div>
           <span className="text-xs text-gray-400 flex items-center gap-1">
             <Clock size={12} />
@@ -105,14 +117,14 @@ export function GameCard({ game, prediction, onPredict, onViewPredictions }: Gam
           </div>
 
           <div className="flex-shrink-0">
-            {game.homeGoals !== null && game.awayGoals !== null ? (
+            {displayScore ? (
               <div className="flex items-center gap-2">
                 <span className={`text-2xl sm:text-3xl font-bold tabular-nums ${brazilTeam === 'home' && isFinished && isBrazilToday ? 'text-[#009739] dark:text-[#4ade80] drop-shadow-[0_0_6px_rgba(255,223,0,0.3)]' : 'text-gray-900 dark:text-gray-100'}`}>
-                  {game.homeGoals}
+                  {displayScore.home}
                 </span>
                 <span className="text-lg text-gray-300 dark:text-gray-600">×</span>
                 <span className={`text-2xl sm:text-3xl font-bold tabular-nums ${brazilTeam === 'away' && isFinished && isBrazilToday ? 'text-[#009739] dark:text-[#4ade80] drop-shadow-[0_0_6px_rgba(255,223,0,0.3)]' : 'text-gray-900 dark:text-gray-100'}`}>
-                  {game.awayGoals}
+                  {displayScore.away}
                 </span>
               </div>
             ) : (

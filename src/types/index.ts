@@ -1,4 +1,5 @@
 export type GameStatus = 'NS' | 'LIVE' | 'FT'
+export type GameDuration = 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT'
 
 export interface Game {
   id: string
@@ -9,6 +10,11 @@ export interface Game {
   homeGoals: number | null
   awayGoals: number | null
   stage: string
+  duration: GameDuration
+  extraTimeHome: number | null
+  extraTimeAway: number | null
+  penaltiesHome: number | null
+  penaltiesAway: number | null
 }
 
 export interface Prediction {
